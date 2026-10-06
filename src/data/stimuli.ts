@@ -13,17 +13,17 @@ import { TARGET_MIN_LEVEL } from '../types/experiment';
 export const LEVELS: readonly SpectrumValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const ROUND_TRIALS: Record<RoundNumber, number> = {
   1: 20,
-  2: 30, // 10 tours supplémentaires au Round 2 pour stabiliser l'adaptation
+  2: 50, // 50 tours au Round 2 pour maximiser l'habituation et la privation initiale
 };
-export const TRIALS_PER_ROUND = 20; // Fallback / baseline
+export const TRIALS_PER_ROUND = 20; // Baseline fallback
 export const DEFAULT_SEED = 20180608; // Levari et al., Science, 29 Jun 2018 (arbitrary but fixed)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prevalence schedules
-// R1: 20 essais, 50% de stimuli >= 6 (10 cibles / 10 non-cibles).
-// R2: 30 essais (+10 tours), 10% de stimuli >= 6 (exactement 3 cibles sur 30).
-//     Forte prévalence sur les niveaux ambigus 3, 4 et 5 pour forcer
-//     l'élargissement de la catégorie ("concept creep").
+// R1: 20 essais, 50% de cibles (10 stimuli <= 5, 10 stimuli >= 6).
+// R2: 50 essais, 10% de cibles exactement (5 stimuli >= 6 et 45 stimuli <= 5).
+//     - 12 premiers essais de chauffe sans AUCUNE cible franche (aucun niveau >= 7).
+//     - 5 cibles réparties de façon espacée sur les 38 essais suivants.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const counts = (c: number[]): LevelCounts =>
@@ -40,11 +40,11 @@ export const PREVALENCE_CONFIGS: Record<RoundNumber, PrevalenceConfig> = {
   },
   2: {
     round: 2,
-    label: 'Prevalence reduction (rare targets - extended)',
-    trialsPerRound: ROUND_TRIALS[2], // 30
-    //                 L1 L2 L3 L4 L5  L6 L7 L8 L9 L10
-    // Somme = 30 : 27 stimuli <= 5, et 3 cibles >= 6 (10% de cibles exactement)
-    levelCounts: counts([2, 3, 5, 8, 9,  2, 0, 0, 1, 0]),
+    label: 'Prevalence reduction (rare targets - 50 trials)',
+    trialsPerRound: ROUND_TRIALS[2], // 50
+    //                 L1 L2 L3  L4  L5  L6 L7 L8 L9 L10
+    // Somme = 50 : 45 items <= 5 (dont 26 ambigus L4-L5) et exactement 5 cibles >= 6 (10%)
+    levelCounts: counts([4, 6, 9, 12, 14,  3, 0, 1, 1, 0]),
     targetPrevalence: 0.1,
   },
 };
@@ -81,13 +81,69 @@ function hasTriple(seq: SpectrumValue[]): boolean {
   return seq.some((v, i) => i >= 2 && v === seq[i - 1] && v === seq[i - 2]);
 }
 
-/** Builds the ordered list of levels of a round (seeded, reproducible). */
+/**
+ * Builds the ordered list of levels of a round (seeded, reproducible).
+ * Pour la Manche 2 (50 essais) :
+ * - Les 12 premiers essais ne contiennent AUCUNE cible franche (aucun stimulus >= 7).
+ * - Les 5 cibles (stimuli >= 6) sont réparties de façon espacée sur les 38 essais suivants.
+ */
 export function buildLevelSequence(round: RoundNumber, seed: number): SpectrumValue[] {
   const rnd = mulberry32(seed + round * 7919);
-  const pool = levelPool(PREVALENCE_CONFIGS[round].levelCounts);
-  let seq = shuffle(pool, rnd);
-  for (let tries = 0; tries < 50 && hasTriple(seq); tries++) seq = shuffle(pool, rnd);
-  return seq;
+  const cfg = PREVALENCE_CONFIGS[round];
+  const pool = levelPool(cfg.levelCounts);
+
+  if (round === 1) {
+    let seq = shuffle(pool, rnd);
+    for (let tries = 0; tries < 50 && hasTriple(seq); tries++) seq = shuffle(pool, rnd);
+    return seq;
+  }
+
+  // --- Round 2 (50 essais avec warm-up de 12 essais sans cible franche) ---
+  const targets = pool.filter((l) => l >= TARGET_MIN_LEVEL); // exactement 5 cibles
+  const nonTargets = pool.filter((l) => l < TARGET_MIN_LEVEL); // 45 items <= 5 (sans aucune cible franche)
+
+  // 12 premiers essais : piochés parmi nonTargets (tous < 6, donc strictement < 7)
+  const shuffledNonTargets = shuffle(nonTargets, rnd);
+  const warmUp = shuffledNonTargets.slice(0, 12);
+  const remainingNonTargets = shuffledNonTargets.slice(12); // 33 items
+
+  // Distribuer les 5 cibles de manière espacée sur les 38 essais suivants
+  // On divise les 38 positions en 5 segments réguliers d'environ 7-8 essais
+  const segments: SpectrumValue[][] = Array.from({ length: 5 }, () => []);
+  const shuffledTargets = shuffle(targets, rnd);
+
+  const chunkSize = Math.floor(remainingNonTargets.length / 5); // 6 ou 7
+  let ntCursor = 0;
+
+  for (let s = 0; s < 5; s++) {
+    const currentChunkSize = s === 4 ? remainingNonTargets.length - ntCursor : chunkSize;
+    const subNonTargets = remainingNonTargets.slice(ntCursor, ntCursor + currentChunkSize);
+    ntCursor += currentChunkSize;
+
+    // Ajouter la cible dans ce segment
+    const combined = [...subNonTargets, shuffledTargets[s]];
+    segments[s] = shuffle(combined, rnd);
+  }
+
+  let finalSeq = [...warmUp, ...segments.flat()];
+
+  // Éviter 3 répétitions identiques consécutives si possible
+  for (let i = 2; i < finalSeq.length; i++) {
+    if (finalSeq[i] === finalSeq[i - 1] && finalSeq[i] === finalSeq[i - 2]) {
+      // Échanger uniquement au sein de la même zone (warm-up [0..11] ou zone principale [12..49])
+      const maxSwap = i < 12 ? 11 : finalSeq.length - 1;
+      for (let j = i + 1; j <= maxSwap; j++) {
+        if (finalSeq[j] !== finalSeq[i]) {
+          const temp = finalSeq[i];
+          finalSeq[i] = finalSeq[j];
+          finalSeq[j] = temp;
+          break;
+        }
+      }
+    }
+  }
+
+  return finalSeq;
 }
 
 /** Builds the 20 Stimulus items of one round for one modality. */

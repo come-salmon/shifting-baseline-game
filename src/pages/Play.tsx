@@ -43,23 +43,49 @@ function TrialRunner({
   const totalTrials = stimuli.length;
   const [idx, setIdx] = useState(Math.min(startIndex, totalTrials - 1));
   const [blank, setBlank] = useState(false);
+  const [isMasked, setIsMasked] = useState(false);
   const shownAt = useRef(performance.now());
   const locked = useRef(false);
+  const maskTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const labels = MODALITY_LABELS[modality];
 
+  // Gestion du timer d'exposition max de 1 000 ms par stimulus
   useEffect(() => {
+    if (maskTimerRef.current) {
+      clearTimeout(maskTimerRef.current);
+      maskTimerRef.current = null;
+    }
+
     if (!blank) {
       shownAt.current = performance.now();
       locked.current = false;
+      setIsMasked(false);
+
+      // Au bout de 1 000 ms exactement, masquer le stimulus
+      maskTimerRef.current = setTimeout(() => {
+        setIsMasked(true);
+      }, 1000);
     }
+
+    return () => {
+      if (maskTimerRef.current) {
+        clearTimeout(maskTimerRef.current);
+      }
+    };
   }, [idx, blank]);
 
   const answer = (response: Response) => {
     if (locked.current || blank) return;
     locked.current = true;
+    if (maskTimerRef.current) {
+      clearTimeout(maskTimerRef.current);
+      maskTimerRef.current = null;
+    }
+
     const rt = Math.round(performance.now() - shownAt.current);
     const isLast = idx + 1 >= totalTrials;
     onAnswer(stimuli[idx], response, rt, isLast);
+
     if (!isLast) {
       setBlank(true); // 180 ms inter-trial blank so the new stimulus is clearly a new event
       setTimeout(() => {
@@ -79,19 +105,54 @@ function TrialRunner({
   });
 
   const btn =
-    'h-[68px] flex-1 touch-none select-none rounded-2xl bg-slate-800 text-lg font-bold tracking-wide active:bg-indigo-600';
+    'h-[68px] flex-1 touch-none select-none rounded-2xl bg-slate-800 text-lg font-bold tracking-wide active:bg-indigo-600 transition-colors shadow-lg';
+
+  const stimSize = modality === 'faces' ? 260 : 240;
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-950 p-4">
+      {/* Barre de progression de la manche */}
       <div className="text-center text-sm font-medium tabular-nums text-slate-400">
         {idx + 1} / {totalTrials}
         <div className="mx-auto mt-2 h-1 w-40 overflow-hidden rounded bg-slate-800">
           <div className="h-full bg-indigo-500" style={{ width: `${((idx + 1) / totalTrials) * 100}%` }} />
         </div>
       </div>
-      <div className="flex flex-1 items-center justify-center">
-        {!blank && <StimulusView modality={modality} level={stimuli[idx].spectrumValue} size={modality === 'faces' ? 260 : 240} />}
+
+      {/* Jauge d'exposition du stimulus (1 000 ms max) */}
+      <div className="mx-auto mt-4 h-1.5 w-64 overflow-hidden rounded-full bg-slate-900 border border-slate-800/80">
+        {!blank && (
+          <div
+            key={idx}
+            className="h-full bg-amber-400/90 rounded-full"
+            style={{
+              animation: 'countdown-timer 1000ms linear forwards',
+            }}
+          />
+        )}
       </div>
+
+      {/* Zone centrale du stimulus ou masque neutre */}
+      <div className="flex flex-1 items-center justify-center">
+        {!blank && (
+          isMasked ? (
+            /* Masque visuel neutre après 1s pour empêcher l'analyse prolongée */
+            <div
+              className="flex items-center justify-center rounded-full bg-slate-900 border-2 border-slate-800 text-slate-600 shadow-2xl transition-all"
+              style={{ width: stimSize, height: stimSize }}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-slate-800/80 animate-pulse" />
+                <span className="text-xs uppercase tracking-wider font-semibold text-slate-500">Mémorisé</span>
+              </div>
+            </div>
+          ) : (
+            <StimulusView modality={modality} level={stimuli[idx].spectrumValue} size={stimSize} />
+          )
+        )}
+      </div>
+
+      {/* Boutons de réponse toujours disponibles */}
       <div className="flex gap-3 pb-2">
         <button className={btn} onPointerDown={() => answer(0)}>{labels.base}</button>
         <button className={btn} onPointerDown={() => answer(1)}>{labels.target}</button>
