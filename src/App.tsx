@@ -3,6 +3,7 @@ import { Monitor, Smartphone } from 'lucide-react';
 import Host from './pages/Host';
 import Play from './pages/Play';
 import Dashboard from './pages/Dashboard';
+import { SyncErrorBanner } from './components/SyncError';
 
 function Landing() {
   return (
@@ -21,13 +22,16 @@ function Landing() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/host" element={<Host />} />
-      <Route path="/play" element={<Play />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="*" element={<Landing />} />
-    </Routes>
+    <>
+      <SyncErrorBanner />
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/host" element={<Host />} />
+        <Route path="/play" element={<Play />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="*" element={<Landing />} />
+      </Routes>
+    </>
   );
 }
 

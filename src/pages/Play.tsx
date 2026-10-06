@@ -6,6 +6,7 @@ import { cleanRoom, displayRoom, getPlayerId, hashString } from '../lib/room';
 import { createPlayer } from '../lib/sync/adapter';
 import { buildRoundStimuli, MODALITY_LABELS, TRIALS_PER_ROUND } from '../data/stimuli';
 import StimulusView from '../components/StimulusView';
+import { SyncErrorScreen } from '../components/SyncError';
 import type { Modality, Player, Response, RoundNumber, Stimulus, TrialResponse } from '../types/experiment';
 
 const Shell = ({ children }: { children: React.ReactNode }) => (
@@ -109,7 +110,7 @@ export default function Play() {
   const [roomCode, setRoomCode] = useState<string | null>(() =>
     localStorage.getItem('sb:joinedRoom') === cleanRoom(params.get('room') ?? '') ? cleanRoom(params.get('room')!) : null,
   );
-  const { state, loaded, adapter } = useRoom(roomCode);
+  const { state, loaded, adapter, error } = useRoom(roomCode);
 
   const [me, setMe] = useState<Player | null>(null);
   const meRef = useRef<Player | null>(null);
@@ -181,6 +182,7 @@ export default function Play() {
     );
   }
 
+  if (error) return <SyncErrorScreen message={error} />;
   if (loaded && !state) {
     return (
       <Message

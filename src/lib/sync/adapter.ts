@@ -3,9 +3,9 @@ import { DEFAULT_SEED } from '../../data/stimuli';
 
 /** Backend-agnostic sync contract (Firebase RTDB, local BroadcastChannel, …). */
 export interface SyncAdapter {
-  readonly kind: 'firebase' | 'local';
-  /** cb receives null when the room does not exist. Returns unsubscribe. */
-  subscribe(room: string, cb: (state: RoomState | null) => void): () => void;
+  readonly kind: 'firebase' | 'local' | 'none';
+  /** cb receives null when the room does not exist. onError fires on read/permission failures. Returns unsubscribe. */
+  subscribe(room: string, cb: (state: RoomState | null) => void, onError?: (e: Error) => void): () => void;
   /** (Re)creates the room: wipes players & votes. */
   createSession(session: Session): Promise<void>;
   updateSession(room: string, patch: Partial<Session>): Promise<void>;

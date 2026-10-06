@@ -2,40 +2,63 @@ import { useEffect, useRef, useState } from 'react';
 import type { Player, RoomState } from '../types/experiment';
 import { getAdapter } from '../lib/sync';
 
+const FIRST_SNAPSHOT_TIMEOUT_MS = 10000;
+
 /** Subscribes to a room. Updates are throttled (150 ms) to survive vote bursts. */
 export function useRoom(roomCode: string | null) {
   const adapter = getAdapter();
   const [state, setState] = useState<RoomState | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setState(null);
     setLoaded(false);
+    setError(null);
     if (!roomCode) return;
     let first = true;
     let latest: RoomState | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const unsub = adapter.subscribe(roomCode, (s) => {
-      latest = s;
+    // Never wait forever for the first snapshot.
+    const watchdog = setTimeout(() => {
       if (first) {
-        first = false;
-        setState(s);
-        setLoaded(true);
-      } else if (!timer) {
-        timer = setTimeout(() => {
-          timer = null;
-          setState(latest);
-        }, 150);
+        const msg = `No answer from the sync backend (${adapter.kind}) after ${FIRST_SNAPSHOT_TIMEOUT_MS / 1000}s for room ${roomCode}. Check the Firebase variables, database URL, rules and network.`;
+        console.error('[useRoom] ' + msg);
+        setError(msg);
       }
-    });
+    }, FIRST_SNAPSHOT_TIMEOUT_MS);
+    const unsub = adapter.subscribe(
+      roomCode,
+      (s) => {
+        latest = s;
+        if (first) {
+          first = false;
+          clearTimeout(watchdog);
+          setError(null);
+          setState(s);
+          setLoaded(true);
+        } else if (!timer) {
+          timer = setTimeout(() => {
+            timer = null;
+            setState(latest);
+          }, 150);
+        }
+      },
+      (e) => {
+        clearTimeout(watchdog);
+        setError(e.message);
+      },
+    );
     return () => {
       unsub();
+      clearTimeout(watchdog);
       if (timer) clearTimeout(timer);
     };
   }, [roomCode, adapter]);
 
-  return { state, loaded, adapter };
+  return { state, loaded, adapter, error };
 }
+
 
 /**
  * Clock-skew-free presence: a player is "online" if its heartbeat value changed

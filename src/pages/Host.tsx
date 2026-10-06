@@ -7,6 +7,7 @@ import { displayRoom, joinUrl, newRoomCode } from '../lib/room';
 import { newSession } from '../lib/sync/adapter';
 import { MODALITY_LABELS } from '../data/stimuli';
 import StatCard from '../components/StatCard';
+import { SyncErrorScreen } from '../components/SyncError';
 import type { Modality, SessionStatus } from '../types/experiment';
 
 const ROOM_KEY = 'sb:hostRoom';
@@ -25,7 +26,7 @@ export default function Host() {
     return saved;
   });
   const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(BASE_KEY) ?? window.location.origin);
-  const { state, loaded, adapter } = useRoom(roomCode);
+  const { state, loaded, adapter, error } = useRoom(roomCode);
   const online = useOnlinePlayers(state?.players ?? {});
 
   // Create the room if it does not exist yet.
@@ -123,6 +124,8 @@ export default function Host() {
     { s: ['ROUND_2_ACTIVE', 'ROUND_2_COMPLETE'], label: 'Round 2' },
     { s: ['DASHBOARD_VIEW'], label: 'Results' },
   ];
+
+  if (error) return <SyncErrorScreen message={error} />;
 
   return (
     <div className="mx-auto flex min-h-full max-w-6xl flex-col gap-6 p-6">

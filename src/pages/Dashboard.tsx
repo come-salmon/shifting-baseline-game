@@ -7,6 +7,7 @@ import { generateSampleDataset, type SampleDataset } from '../data/sampleDataset
 import { MODALITY_LABELS } from '../data/stimuli';
 import { displayRoom } from '../lib/room';
 import StatCard from '../components/StatCard';
+import { SyncErrorScreen } from '../components/SyncError';
 import PsychometricCurve from '../components/dashboard/PsychometricCurve';
 import ThresholdGauge from '../components/dashboard/ThresholdGauge';
 import SlopeChart from '../components/dashboard/SlopeChart';
@@ -20,7 +21,7 @@ export default function Dashboard() {
   const [params] = useSearchParams();
   const room = params.get('room') ?? localStorage.getItem('sb:hostRoom');
   const [sample, setSample] = useState<SampleDataset | null>(null);
-  const { state } = useRoom(sample ? null : room);
+  const { state, error } = useRoom(sample ? null : room);
 
   const [modality, setModality] = useState<Modality>(state?.session.selectedModality ?? 'dots');
   const [scope, setScope] = useState<string>('ROOM');
@@ -64,6 +65,16 @@ export default function Dashboard() {
   );
 
   const nTotal = playerIds.length;
+  if (error && !sample) {
+    return (
+      <div>
+        <SyncErrorScreen message={error} />
+        <div className="fixed bottom-4 right-4">
+          <button onClick={() => setSample(generateSampleDataset())} className="rounded-xl bg-amber-600/20 px-4 py-3 text-amber-300">Load sample dataset instead</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
