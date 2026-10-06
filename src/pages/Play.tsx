@@ -48,8 +48,10 @@ function TrialRunner({
   const locked = useRef(false);
   const maskTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const labels = MODALITY_LABELS[modality];
+  // 1.0s (1000ms) pour les couleurs (dots), 1.75s (1750ms) pour les visages (faces)
+  const exposureDurationMs = modality === 'faces' ? 1750 : 1000;
 
-  // Gestion du timer d'exposition max de 1 000 ms par stimulus
+  // Gestion du timer d'exposition max par stimulus (1s dots, 1.75s faces)
   useEffect(() => {
     if (maskTimerRef.current) {
       clearTimeout(maskTimerRef.current);
@@ -61,10 +63,10 @@ function TrialRunner({
       locked.current = false;
       setIsMasked(false);
 
-      // Au bout de 1 000 ms exactement, masquer le stimulus
+      // Masquer le stimulus dès l'écoulement du cooldown
       maskTimerRef.current = setTimeout(() => {
         setIsMasked(true);
-      }, 1000);
+      }, exposureDurationMs);
     }
 
     return () => {
@@ -72,7 +74,7 @@ function TrialRunner({
         clearTimeout(maskTimerRef.current);
       }
     };
-  }, [idx, blank]);
+  }, [idx, blank, exposureDurationMs]);
 
   const answer = (response: Response) => {
     if (locked.current || blank) return;
@@ -119,14 +121,14 @@ function TrialRunner({
         </div>
       </div>
 
-      {/* Jauge d'exposition du stimulus (1 000 ms max) */}
+      {/* Jauge d'exposition du stimulus (1.0s dots / 1.75s faces) */}
       <div className="mx-auto mt-4 h-1.5 w-64 overflow-hidden rounded-full bg-slate-900 border border-slate-800/80">
         {!blank && (
           <div
-            key={idx}
+            key={`${modality}-${idx}`}
             className="h-full bg-amber-400/90 rounded-full"
             style={{
-              animation: 'countdown-timer 1000ms linear forwards',
+              animation: `countdown-timer ${exposureDurationMs}ms linear forwards`,
             }}
           />
         )}
