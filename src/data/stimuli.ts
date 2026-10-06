@@ -119,20 +119,21 @@ export const STIMULI: Record<Modality, Record<RoundNumber, Stimulus[]>> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Modality 1: dots (HSL hue 280° → 210°, S 80%, L 50%)
+// Modality 1: dots (Narrow HSL hue scale: 268° → 240°, S 70%, L 52%)
+// Creates realistic ambiguity in levels 4, 5, and 6 to trigger PICC.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const DOT_LEVELS: Record<SpectrumValue, DotLevelDef> = {
-  1: { level: 1, hue: 280, hex: '#A219E6' }, // pure violet
-  2: { level: 2, hue: 272, hex: '#8619E6' },
-  3: { level: 3, hue: 264, hex: '#6B19E6' },
-  4: { level: 4, hue: 256, hex: '#5019E6' },
-  5: { level: 5, hue: 248, hex: '#3519E6' }, // ambiguous boundary
-  6: { level: 6, hue: 240, hex: '#1919E6' },
-  7: { level: 7, hue: 232, hex: '#1935E6' },
-  8: { level: 8, hue: 224, hex: '#1950E6' },
-  9: { level: 9, hue: 216, hex: '#196BE6' },
-  10: { level: 10, hue: 210, hex: '#1980E6' }, // pure blue
+  1: { level: 1, hue: 268, hex: '#7F2FDA' }, // bluish violet (ambiguous start)
+  2: { level: 2, hue: 264.9, hex: '#762FDA' },
+  3: { level: 3, hue: 261.8, hex: '#6D2FDA' },
+  4: { level: 4, hue: 258.7, hex: '#642FDA' }, // highly ambiguous
+  5: { level: 5, hue: 255.6, hex: '#5B2FDA' }, // critical subjective boundary
+  6: { level: 6, hue: 252.4, hex: '#522FDA' }, // subtle shift toward blue
+  7: { level: 7, hue: 249.3, hex: '#4A2FDA' },
+  8: { level: 8, hue: 246.2, hex: '#412FDA' },
+  9: { level: 9, hue: 243.1, hex: '#382FDA' },
+  10: { level: 10, hue: 240, hex: '#2F2FDA' }, // blue
 };
 
 export const DOT_RADIUS_PX = 100;
