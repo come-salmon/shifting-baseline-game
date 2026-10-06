@@ -65,7 +65,7 @@ export function generateSampleDataset(nPlayers = 34, seed = 42): SampleDataset {
             answeredAt: 0,
           });
         });
-        p.progress[m][r] = 20;
+        p.progress[m][r] = stims.length;
         p.completed[m][r] = true;
       }
     }

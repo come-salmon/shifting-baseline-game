@@ -4,7 +4,7 @@ import { CheckCircle2, Loader2, Wifi } from 'lucide-react';
 import { useRoom } from '../hooks/useRoom';
 import { cleanRoom, displayRoom, getPlayerId, hashString } from '../lib/room';
 import { createPlayer } from '../lib/sync/adapter';
-import { buildRoundStimuli, MODALITY_LABELS, TRIALS_PER_ROUND } from '../data/stimuli';
+import { buildRoundStimuli, MODALITY_LABELS } from '../data/stimuli';
 import StimulusView from '../components/StimulusView';
 import { SyncErrorScreen } from '../components/SyncError';
 import type { Modality, Player, Response, RoundNumber, Stimulus, TrialResponse } from '../types/experiment';
@@ -40,7 +40,8 @@ function TrialRunner({
   onAnswer: (stim: Stimulus, response: Response, rtMs: number, isLast: boolean) => void;
 }) {
   const stimuli = useMemo(() => buildRoundStimuli(modality, round, seed), [modality, round, seed]);
-  const [idx, setIdx] = useState(Math.min(startIndex, TRIALS_PER_ROUND - 1));
+  const totalTrials = stimuli.length;
+  const [idx, setIdx] = useState(Math.min(startIndex, totalTrials - 1));
   const [blank, setBlank] = useState(false);
   const shownAt = useRef(performance.now());
   const locked = useRef(false);
@@ -57,7 +58,7 @@ function TrialRunner({
     if (locked.current || blank) return;
     locked.current = true;
     const rt = Math.round(performance.now() - shownAt.current);
-    const isLast = idx + 1 >= TRIALS_PER_ROUND;
+    const isLast = idx + 1 >= totalTrials;
     onAnswer(stimuli[idx], response, rt, isLast);
     if (!isLast) {
       setBlank(true); // 180 ms inter-trial blank so the new stimulus is clearly a new event
@@ -83,9 +84,9 @@ function TrialRunner({
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-950 p-4">
       <div className="text-center text-sm font-medium tabular-nums text-slate-400">
-        {idx + 1} / {TRIALS_PER_ROUND}
+        {idx + 1} / {totalTrials}
         <div className="mx-auto mt-2 h-1 w-40 overflow-hidden rounded bg-slate-800">
-          <div className="h-full bg-indigo-500" style={{ width: `${((idx + 1) / TRIALS_PER_ROUND) * 100}%` }} />
+          <div className="h-full bg-indigo-500" style={{ width: `${((idx + 1) / totalTrials) * 100}%` }} />
         </div>
       </div>
       <div className="flex flex-1 items-center justify-center">

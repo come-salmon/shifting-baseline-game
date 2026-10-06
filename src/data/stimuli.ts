@@ -11,15 +11,19 @@ import type {
 import { TARGET_MIN_LEVEL } from '../types/experiment';
 
 export const LEVELS: readonly SpectrumValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-export const TRIALS_PER_ROUND = 20;
+export const ROUND_TRIALS: Record<RoundNumber, number> = {
+  1: 20,
+  2: 30, // 10 tours supplémentaires au Round 2 pour stabiliser l'adaptation
+};
+export const TRIALS_PER_ROUND = 20; // Fallback / baseline
 export const DEFAULT_SEED = 20180608; // Levari et al., Science, 29 Jun 2018 (arbitrary but fixed)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prevalence schedules
-// Level counts are designed so that the share of levels >= 6 is EXACTLY
-// 50% (R1) and 10% (R2). Note: the spec text lists levels 6–7 as "ambiguous"
-// in R2; we keep only ONE level-6 item and one level-9 item as targets so
-// that the 10% target prevalence holds, and concentrate the ambiguity on 3–5.
+// R1: 20 essais, 50% de stimuli >= 6 (10 cibles / 10 non-cibles).
+// R2: 30 essais (+10 tours), 10% de stimuli >= 6 (exactement 3 cibles sur 30).
+//     Forte prévalence sur les niveaux ambigus 3, 4 et 5 pour forcer
+//     l'élargissement de la catégorie ("concept creep").
 // ─────────────────────────────────────────────────────────────────────────────
 
 const counts = (c: number[]): LevelCounts =>
@@ -29,17 +33,18 @@ export const PREVALENCE_CONFIGS: Record<RoundNumber, PrevalenceConfig> = {
   1: {
     round: 1,
     label: 'Baseline calibration (balanced)',
-    trialsPerRound: TRIALS_PER_ROUND,
+    trialsPerRound: ROUND_TRIALS[1], // 20
     //                 L1 L2 L3 L4 L5 L6 L7 L8 L9 L10
     levelCounts: counts([2, 2, 2, 2, 2, 2, 2, 2, 2, 2]), // 10 low (1–5) / 10 high (6–10)
     targetPrevalence: 0.5,
   },
   2: {
     round: 2,
-    label: 'Prevalence reduction (rare targets)',
-    trialsPerRound: TRIALS_PER_ROUND,
-    //                 L1 L2 L3 L4 L5 L6 L7 L8 L9 L10
-    levelCounts: counts([1, 2, 3, 5, 7, 1, 0, 0, 1, 0]), // 6 clear low / 12 ambiguous (4–5 + 3) / 2 targets
+    label: 'Prevalence reduction (rare targets - extended)',
+    trialsPerRound: ROUND_TRIALS[2], // 30
+    //                 L1 L2 L3 L4 L5  L6 L7 L8 L9 L10
+    // Somme = 30 : 27 stimuli <= 5, et 3 cibles >= 6 (10% de cibles exactement)
+    levelCounts: counts([2, 3, 5, 8, 9,  2, 0, 0, 1, 0]),
     targetPrevalence: 0.1,
   },
 };
@@ -119,21 +124,23 @@ export const STIMULI: Record<Modality, Record<RoundNumber, Stimulus[]>> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Modality 1: dots (Narrow HSL hue scale: 268° → 240°, S 70%, L 52%)
-// Creates realistic ambiguity in levels 4, 5, and 6 to trigger PICC.
+// Modality 1: dots (Ultra-narrow HSL scale: 258° → 240°, S 68%, L 52%)
+// Différence de nuance extrêmement subtile (~2° par palier) :
+// les niveaux 1 à 10 forment un dégradé continu et subtil où les
+// niveaux 4, 5 et 6 sont indiscernables sans repère absolu.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const DOT_LEVELS: Record<SpectrumValue, DotLevelDef> = {
-  1: { level: 1, hue: 268, hex: '#7F2FDA' }, // bluish violet (ambiguous start)
-  2: { level: 2, hue: 264.9, hex: '#762FDA' },
-  3: { level: 3, hue: 261.8, hex: '#6D2FDA' },
-  4: { level: 4, hue: 258.7, hex: '#642FDA' }, // highly ambiguous
-  5: { level: 5, hue: 255.6, hex: '#5B2FDA' }, // critical subjective boundary
-  6: { level: 6, hue: 252.4, hex: '#522FDA' }, // subtle shift toward blue
-  7: { level: 7, hue: 249.3, hex: '#4A2FDA' },
-  8: { level: 8, hue: 246.2, hex: '#412FDA' },
-  9: { level: 9, hue: 243.1, hex: '#382FDA' },
-  10: { level: 10, hue: 240, hex: '#2F2FDA' }, // blue
+  1: { level: 1, hue: 258, hex: '#6331D8' }, // violet bleuté très subtil
+  2: { level: 2, hue: 256, hex: '#5E31D8' },
+  3: { level: 3, hue: 254, hex: '#5831D8' },
+  4: { level: 4, hue: 252, hex: '#5331D8' }, // zone d'indécision totale
+  5: { level: 5, hue: 250, hex: '#4D31D8' }, // frontière 50%
+  6: { level: 6, hue: 248, hex: '#4831D8' }, // quasi identique aux niveaux 4 et 5
+  7: { level: 7, hue: 246, hex: '#4231D8' },
+  8: { level: 8, hue: 244, hex: '#3C31D8' },
+  9: { level: 9, hue: 242, hex: '#3731D8' },
+  10: { level: 10, hue: 240, hex: '#3131D8' }, // bleu franc
 };
 
 export const DOT_RADIUS_PX = 100;
